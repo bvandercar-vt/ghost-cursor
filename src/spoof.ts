@@ -829,7 +829,7 @@ export const createCursor = (
 
       await this.click(selectElem, optionsResolved)
 
-      await page.evaluate((selectElem) => {
+      await selectElem.evaluate((selectElem) => {
         const optionVals = Array.from(selectElem.querySelectorAll('option'))
           .map((e) => e.textContent)
           .filter(text => text !== null) as string[]
@@ -842,7 +842,7 @@ export const createCursor = (
         const selectParent = selectElem.parentElement
         if (selectParent == null) throw new Error('no parent')
         selectParent.append(mockSelectOptions)
-      }, selectElem)
+      })
 
       await delay(200)
 
@@ -852,12 +852,12 @@ export const createCursor = (
 
       await selectElem.select(...castArray(values))
 
-      await page.evaluate((selectElem) => {
+      await selectElem.evaluate((selectElem) => {
         const selectParent = selectElem.parentElement
         if (selectParent == null) throw new Error('no parent')
         const mockSelectOptions = selectParent.querySelectorAll('.mock-select-options')[0]
         mockSelectOptions.remove()
-      }, selectElem)
+      })
     }
   }
 
