@@ -134,6 +134,15 @@ export interface MoveToOptions extends PathOptions, Pick<MoveOptions, 'moveDelay
   readonly moveDelay?: number
 }
 
+export interface SelectOptions extends ClickOptions {
+  /**
+   * Delay between clicking the `select` and moving to the options, as well
+   * as the delay between moving to each option.
+   * @default 100
+   */
+  readonly moveDelay?: number
+}
+
 export interface GhostCursor {
   toggleRandomMove: (random: boolean) => void
   click: (
@@ -153,6 +162,10 @@ export interface GhostCursor {
   getElement: (
     selector: string | ElementHandle,
     options?: GetElementOptions) => Promise<ElementHandle<Element>>
+  select: (
+    selector: string,
+    values: string | string[],
+    options?: SelectOptions) => Promise<void>
   getLocation: () => Vector
 }
 
@@ -161,6 +174,10 @@ const delay = async (ms: number): Promise<void> => {
   if (ms < 1) return
   return await new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+/** Convert item to array if isn't already  */
+const castArray = <T>(value: T | T[]): T[] =>
+  Array.isArray(value) ? value : [value]
 
 /**
  * Calculate the amount of time needed to move from (x1, y1) to (x2, y2)
@@ -398,6 +415,11 @@ export const createCursor = (
      * @default GetElementOptions
      */
     getElement?: GetElementOptions
+    /**
+      * Default options for the `select` function
+      * @default SelectOptions
+      */
+    select?: SelectOptions
   } = {}
 ): GhostCursor => {
   // this is kind of arbitrary, not a big fan but it seems to work
@@ -794,6 +816,48 @@ export const createCursor = (
         elem = selector
       }
       return elem
+    },
+
+    async select (selector: string, values: string | string[], options?: SelectOptions) {
+      const optionsResolved = {
+        moveDelay: 100,
+        ...defaultOptions.select,
+        ...options
+      } satisfies SelectOptions
+
+      const selectElem = await this.getElement(selector)
+
+      await this.click(selectElem, optionsResolved)
+
+      await page.evaluate((selectElem) => {
+        const optionVals = Array.from(selectElem.querySelectorAll('option'))
+          .map((e) => e.textContent)
+          .filter(text => text !== null) as string[]
+
+        const mockSelectOptions = document.createElement('div')
+        mockSelectOptions.classList.add('mock-select-options')
+        mockSelectOptions.innerHTML = optionVals.map((v) => `<p>${v}</p>`).join('\n')
+
+        // TODO: just position absolutely where the Select is, not the parent
+        const selectParent = selectElem.parentElement
+        if (selectParent == null) throw new Error('no parent')
+        selectParent.append(mockSelectOptions)
+      }, selectElem)
+
+      await delay(200)
+
+      for await (const value of castArray(values)) {
+        await this.move(`.mock-select p::-p-text("${value}")`, { moveDelay: optionsResolved.moveDelay })
+      }
+
+      await selectElem.select(...castArray(values))
+
+      await page.evaluate((selectElem) => {
+        const selectParent = selectElem.parentElement
+        if (selectParent == null) throw new Error('no parent')
+        const mockSelectOptions = selectParent.querySelectorAll('.mock-select-options')[0]
+        mockSelectOptions.remove()
+      }, selectElem)
     }
   }
 

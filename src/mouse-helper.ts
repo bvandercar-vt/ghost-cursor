@@ -49,6 +49,14 @@ async function installMouseHelper (page: Page): Promise<void> {
         p-mouse-pointer-hide {
           display: none
         }
+
+        .mock-select-options {
+          position: absolute;
+          width: 100%;
+          z-index: 100;
+          outline: 1px solid black;
+          background-color: rgba(200,200,200,0.9);
+        }
       `
       document.head.appendChild(styleElement)
       document.body.appendChild(box)
